@@ -89,13 +89,11 @@
       background:rgba(255,255,255,.04);
       border-radius:14px;padding:10px;
       display:grid;
-      grid-template-columns: 1.1fr 140px 1fr 130px;
+      grid-template-columns: 1.1fr 160px 1fr 130px;
       gap:10px;
       align-items:center;
     }
-    @media(max-width:980px){
-      .item{grid-template-columns:1fr; }
-    }
+    @media(max-width:980px){ .item{grid-template-columns:1fr} }
     .tag{font-family:var(--mono);font-size:12px;color:rgba(255,255,255,.62)}
     .splitbox{
       display:none;
@@ -106,6 +104,55 @@
     .splitrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .splitrow label{width:80px;font-family:var(--mono);font-size:12px;color:rgba(255,255,255,.65)}
     .tiny{width:90px;min-height:36px;padding:8px 10px;font-family:var(--mono)}
+
+    /* --- MAP --- */
+    .mapWrap{
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.14);
+      border-radius:14px;
+      padding:12px;
+      overflow:auto;
+    }
+    .mapTop{
+      display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .mapTop .row{gap:8px}
+    svg#usMap{
+      width:100%;
+      min-width: 680px;
+      height:auto;
+    }
+    .tile{
+      cursor:pointer;
+      stroke: rgba(255,255,255,.18);
+      stroke-width: 1;
+      rx: 6; ry: 6;
+      fill: rgba(255,255,255,.05);
+      transition: transform .06s ease, fill .2s ease, stroke .2s ease;
+    }
+    .tile:hover{
+      fill: rgba(255,255,255,.10);
+      stroke: rgba(56,189,248,.45);
+    }
+    .tile.selected{
+      stroke: rgba(56,189,248,.85);
+      fill: rgba(56,189,248,.18);
+    }
+    .tile.assigned{
+      fill: rgba(34,197,94,.16);
+      stroke: rgba(34,197,94,.55);
+    }
+    .tile.unassigned{
+      fill: rgba(255,255,255,.05);
+    }
+    .abbr{
+      font-family: var(--mono);
+      font-size: 11px;
+      fill: rgba(255,255,255,.86);
+      pointer-events:none;
+      user-select:none;
+    }
     .toast{
       position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
       background:rgba(10,12,18,.85);border:1px solid rgba(255,255,255,.14);
@@ -121,7 +168,7 @@
   <header>
     <div>
       <h1>Delegate Calculator</h1>
-      <div class="sub">Assign each state/territory to a candidate with a dropdown. Supers are weighted blocs. Split mode exists for when you feel like suffering.</div>
+      <div class="sub">Click states on the map, assign winners with dropdowns, and use split mode only when you feel like getting punished.</div>
     </div>
     <div class="row">
       <div class="pill"><div><div class="k">Total</div><div class="v" id="pTotal">0</div></div></div>
@@ -168,8 +215,32 @@
           </label>
         </div>
       </div>
+
       <div class="bd">
-        <div class="card" style="box-shadow:none;background:rgba(255,255,255,.03);border-radius:var(--radius);border:1px solid rgba(255,255,255,.10);margin-bottom:12px">
+        <!-- MAP -->
+        <div class="mapWrap">
+          <div class="mapTop">
+            <div class="small">
+              <strong>US Map</strong> (tile map): click a state to jump to it.
+            </div>
+            <div class="row">
+              <label class="row small" style="gap:8px">
+                <input type="checkbox" id="mapAssignOn">
+                Map assign mode
+              </label>
+              <select class="select" id="mapAssignPick" style="min-width:220px"></select>
+              <button class="btn ghost" id="mapClearSelect">Clear selection</button>
+            </div>
+          </div>
+          <svg id="usMap" viewBox="0 0 640 360" role="img" aria-label="US tile map">
+            <!-- tiles injected by JS -->
+          </svg>
+          <div class="small" style="margin-top:8px">
+            Map assign mode: pick a candidate once, then click states to assign them instantly.
+          </div>
+        </div>
+
+        <div class="card" style="box-shadow:none;background:rgba(255,255,255,.03);border-radius:var(--radius);border:1px solid rgba(255,255,255,.10);margin:12px 0">
           <div class="hd" style="border-bottom:1px solid rgba(255,255,255,.08)">
             <h2>Superdelegates (Weighted Blocs)</h2>
             <div class="tag">Total: <span id="supInline">0</span></div>
@@ -192,7 +263,7 @@
 
 <script>
 (() => {
-  const KEY = "delegate_calc_friendly_v1";
+  const KEY = "delegate_calc_friendly_map_v1";
 
   const DEFAULT_J = [
     { name: "California", delegates: 420 },
@@ -272,6 +343,31 @@
     { id: crypto.randomUUID(), name: "Candidate B", short: "B" },
   ];
 
+  // --- Tile map coordinates (grid-style) ---
+  // Layout is a well-known “US tile grid map” style. Each tile is 26x20.
+  const TILE = { w: 26, h: 20, gap: 6, x0: 16, y0: 16 };
+  const TILE_POS = [
+    // row, col positions (approx tile grid)
+    ["WA",0,0],["MT",0,2],["ND",0,4],["MN",0,5],["WI",0,6],["MI",0,7],["VT",0,9],["NH",0,10],["ME",0,11],
+    ["OR",1,0],["ID",1,1],["WY",1,2],["SD",1,4],["IA",1,5],["IL",1,6],["IN",1,7],["OH",1,8],["PA",1,9],["NY",1,10],["MA",1,11],
+    ["CA",2,0],["NV",2,1],["UT",2,2],["CO",2,3],["NE",2,4],["MO",2,5],["KY",2,6],["WV",2,7],["VA",2,8],["MD",2,9],["NJ",2,10],["CT",2,11],["RI",2,12],
+    ["AZ",3,1],["NM",3,2],["KS",3,4],["AR",3,5],["TN",3,6],["NC",3,7],["SC",3,8],["DC",3,9],["DE",3,10],
+    ["TX",4,2],["OK",4,4],["LA",4,5],["MS",4,6],["AL",4,7],["GA",4,8],
+    ["FL",5,9],
+    ["AK",6,0],["HI",6,1],
+  ];
+
+  // Abbrev ↔ name mapping (for jumping to your list, which is by full name)
+  const ABBR_TO_NAME = {
+    "AL":"Alabama","AK":"Alaska","AZ":"Arizona","AR":"Arkansas","CA":"California","CO":"Colorado","CT":"Connecticut","DE":"Delaware",
+    "DC":"District of Columbia","FL":"Florida","GA":"Georgia","HI":"Hawaii","ID":"Idaho","IL":"Illinois","IN":"Indiana","IA":"Iowa",
+    "KS":"Kansas","KY":"Kentucky","LA":"Louisiana","ME":"Maine","MD":"Maryland","MA":"Massachusetts","MI":"Michigan","MN":"Minnesota",
+    "MS":"Mississippi","MO":"Missouri","MT":"Montana","NE":"Nebraska","NV":"Nevada","NH":"New Hampshire","NJ":"New Jersey","NM":"New Mexico",
+    "NY":"New York","NC":"North Carolina","ND":"North Dakota","OH":"Ohio","OK":"Oklahoma","OR":"Oregon","PA":"Pennsylvania","RI":"Rhode Island",
+    "SC":"South Carolina","SD":"South Dakota","TN":"Tennessee","TX":"Texas","UT":"Utah","VT":"Vermont","VA":"Virginia","WA":"Washington",
+    "WV":"West Virginia","WI":"Wisconsin","WY":"Wyoming"
+  };
+
   const $ = s => document.querySelector(s);
   const toastEl = $("#toast");
   function toast(msg){
@@ -285,12 +381,10 @@
       candidates: structuredClone(DEFAULT_C),
       jurisdictions: structuredClone(DEFAULT_J),
       supers: structuredClone(DEFAULT_SUPERS),
-      // winner assignment (fast path): { jName: candidateId|null }
       winners: {},
-      // split allocations: { jName: { candidateId: number } }
       splits: {},
-      // super assignments: { superId: candidateId|null }
       superPick: {},
+      mapSelectedAbbr: null,
     };
     for(const j of st.jurisdictions){
       st.winners[j.name] = null;
@@ -307,13 +401,13 @@
       if(!raw) return defState();
       const st = JSON.parse(raw);
 
-      // repair minimal
       st.candidates ??= structuredClone(DEFAULT_C);
       st.jurisdictions ??= structuredClone(DEFAULT_J);
       st.supers ??= structuredClone(DEFAULT_SUPERS);
       st.winners ??= {};
       st.splits ??= {};
       st.superPick ??= {};
+      st.mapSelectedAbbr ??= null;
 
       for(const j of st.jurisdictions){
         if(!(j.name in st.winners)) st.winners[j.name] = null;
@@ -325,7 +419,6 @@
       for(const s of st.supers){
         if(!(s.id in st.superPick)) st.superPick[s.id] = null;
       }
-
       return st;
     } catch {
       return defState();
@@ -344,25 +437,21 @@
     const t = {};
     for(const c of state.candidates) t[c.id]=0;
 
-    // States/Terr
     for(const j of state.jurisdictions){
       const win = state.winners[j.name];
       const del = Number(j.delegates)||0;
       if(win){
         t[win] += del;
       } else {
-        // split totals
         const split = state.splits[j.name] || {};
         for(const c of state.candidates) t[c.id] += Number(split[c.id]||0);
       }
     }
 
-    // Supers
     for(const s of state.supers){
       const pick = state.superPick[s.id];
       if(pick) t[pick] += Number(s.votes||0);
     }
-
     return t;
   }
 
@@ -372,6 +461,108 @@
     $("#pST").textContent = sumST();
     $("#pSup").textContent = sumSup();
     $("#supInline").textContent = sumSup();
+  }
+
+  function candidateOptions(selectedId){
+    const frag = document.createDocumentFragment();
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "Unassigned";
+    frag.appendChild(opt0);
+
+    for(const c of state.candidates){
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = `${c.short} • ${c.name}`;
+      if(selectedId===c.id) opt.selected=true;
+      frag.appendChild(opt);
+    }
+    return frag;
+  }
+
+  function renderMapAssignPicker(){
+    const sel = $("#mapAssignPick");
+    sel.innerHTML = "";
+    sel.appendChild(candidateOptions(sel.value || null));
+  }
+
+  function renderMap(){
+    const svg = $("#usMap");
+    svg.innerHTML = "";
+
+    const mapAssignOn = $("#mapAssignOn").checked;
+    const mapAssignPick = $("#mapAssignPick").value || null;
+
+    // Helper to check if assigned
+    function isAbbrAssigned(abbr){
+      const name = ABBR_TO_NAME[abbr];
+      if(!name) return false;
+      return !!state.winners[name];
+    }
+
+    TILE_POS.forEach(([abbr, r, c]) => {
+      const x = TILE.x0 + c*(TILE.w + TILE.gap);
+      const y = TILE.y0 + r*(TILE.h + TILE.gap);
+
+      const name = ABBR_TO_NAME[abbr];
+      const selected = state.mapSelectedAbbr === abbr;
+      const assigned = isAbbrAssigned(abbr);
+
+      const g = document.createElementNS("http://www.w3.org/2000/svg","g");
+
+      const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+      rect.setAttribute("x", x);
+      rect.setAttribute("y", y);
+      rect.setAttribute("width", TILE.w);
+      rect.setAttribute("height", TILE.h);
+      rect.setAttribute("class", `tile ${selected ? "selected" : ""} ${assigned ? "assigned" : "unassigned"}`);
+      rect.setAttribute("data-abbr", abbr);
+      rect.setAttribute("role","button");
+      rect.setAttribute("tabindex","0");
+      rect.setAttribute("aria-label", name ? `${name}` : abbr);
+
+      const text = document.createElementNS("http://www.w3.org/2000/svg","text");
+      text.setAttribute("x", x + TILE.w/2);
+      text.setAttribute("y", y + TILE.h/2 + 4);
+      text.setAttribute("text-anchor","middle");
+      text.setAttribute("class","abbr");
+      text.textContent = abbr;
+
+      const click = () => {
+        state.mapSelectedAbbr = abbr;
+        save();
+
+        const fullName = ABBR_TO_NAME[abbr];
+        if(fullName){
+          // If map assign mode, apply instantly
+          if(mapAssignOn && mapAssignPick){
+            // Assign winner and clear splits
+            state.winners[fullName] = mapAssignPick;
+            for(const cand of state.candidates) state.splits[fullName][cand.id]=0;
+            save();
+            toast(`${abbr} assigned.`);
+          }
+
+          // Jump to the state card
+          $("#search").value = fullName;
+          renderStates(); // refresh list filtered
+          // Scroll smoothly to the first matching state item
+          setTimeout(() => {
+            const el = document.querySelector(`[data-statecard="${CSS.escape(fullName)}"]`);
+            if(el) el.scrollIntoView({behavior:"smooth", block:"center"});
+          }, 30);
+        }
+
+        renderAll();
+      };
+
+      rect.addEventListener("click", click);
+      rect.addEventListener("keydown", (e)=>{ if(e.key==="Enter" || e.key===" "){ e.preventDefault(); click(); } });
+
+      g.appendChild(rect);
+      g.appendChild(text);
+      svg.appendChild(g);
+    });
   }
 
   function renderLeaders(){
@@ -412,7 +603,6 @@
         if(state.candidates.length<=1){ toast("Need at least 1 candidate."); return; }
         state.candidates = state.candidates.filter(c=>c.id!==id);
 
-        // remove from splits + winners + supers
         for(const j of state.jurisdictions){
           delete state.splits[j.name][id];
           if(state.winners[j.name]===id) state.winners[j.name]=null;
@@ -423,23 +613,6 @@
         save(); renderAll(); toast("Candidate removed.");
       });
     });
-  }
-
-  function candidateOptions(selectedId){
-    const frag = document.createDocumentFragment();
-    const opt0 = document.createElement("option");
-    opt0.value = "";
-    opt0.textContent = "Unassigned";
-    frag.appendChild(opt0);
-
-    for(const c of state.candidates){
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      opt.textContent = `${c.short} • ${c.name}`;
-      if(selectedId===c.id) opt.selected=true;
-      frag.appendChild(opt);
-    }
-    return frag;
   }
 
   function renderSupers(){
@@ -497,20 +670,16 @@
     for(const c of state.candidates) sum += Number(split[c.id]||0);
     if(sum <= cap) return;
 
-    // scale down proportionally
     const scaled = state.candidates.map(c=>{
       const v = Number(split[c.id]||0);
-      return { id:c.id, raw: v, val: sum ? (v/sum)*cap : 0 };
+      return { id:c.id, val: sum ? (v/sum)*cap : 0 };
     });
-    // floor then distribute remainder
-    let used = 0;
     const floored = scaled.map(x=>({id:x.id, v:Math.floor(x.val), frac:x.val-Math.floor(x.val)}));
-    used = floored.reduce((a,x)=>a+x.v,0);
+    let used = floored.reduce((a,x)=>a+x.v,0);
     let rem = cap - used;
     floored.sort((a,b)=>b.frac-a.frac);
     let i=0;
     while(rem>0 && i<floored.length){ floored[i].v++; rem--; i++; }
-    // write back
     for(const f of floored) split[f.id]=f.v;
   }
 
@@ -524,7 +693,6 @@
     if(q) items = items.filter(j=>j.name.toLowerCase().includes(q));
 
     for(const j of items){
-      // repair split keys for new candidates
       state.splits[j.name] ??= {};
       for(const c of state.candidates){
         if(typeof state.splits[j.name][c.id] !== "number") state.splits[j.name][c.id]=0;
@@ -532,6 +700,7 @@
 
       const node = document.createElement("div");
       node.className="item";
+      node.setAttribute("data-statecard", j.name);
       node.innerHTML = `
         <div>
           <div style="font-weight:850">${j.name}</div>
@@ -555,82 +724,77 @@
       `;
       box.appendChild(node);
 
-      // Dropdown
       const sel = node.querySelector(`[data-win="${j.name}"]`);
       sel.appendChild(candidateOptions(state.winners[j.name]));
       sel.addEventListener("change", (e)=>{
         const val = e.target.value || null;
         state.winners[j.name] = val;
-
-        // if winner chosen, zero splits for cleanliness
         if(val){
-          for(const c of state.candidates) state.splits[j.name][c.id]=0;
+          for(const cand of state.candidates) state.splits[j.name][cand.id]=0;
         }
         save(); renderAll();
       });
 
-      // Clear
       node.querySelector(`[data-clear="${j.name}"]`).addEventListener("click", ()=>{
         state.winners[j.name]=null;
-        for(const c of state.candidates) state.splits[j.name][c.id]=0;
+        for(const cand of state.candidates) state.splits[j.name][cand.id]=0;
         save(); renderAll();
       });
 
-      // Split UI
       const splitbox = node.querySelector(`[data-splitbox="${j.name}"]`);
       const showSplit = splitOn && !state.winners[j.name];
       splitbox.style.display = showSplit ? "flex" : "none";
 
       if(showSplit){
         splitbox.innerHTML = "";
-        for(const c of state.candidates){
+        for(const cand of state.candidates){
           const r = document.createElement("div");
           r.className="splitrow";
           r.innerHTML = `
-            <label title="${c.name}">${c.short}</label>
-            <input class="input tiny" type="number" min="0" step="1" value="${Number(state.splits[j.name][c.id]||0)}" data-s="${j.name}" data-c="${c.id}">
+            <label title="${cand.name}">${cand.short}</label>
+            <input class="input tiny" type="number" min="0" step="1"
+              value="${Number(state.splits[j.name][cand.id]||0)}" data-s="${j.name}" data-c="${cand.id}">
           `;
           splitbox.appendChild(r);
           const inp = r.querySelector("input");
           inp.addEventListener("change", (e)=>{
             const n = Math.max(0, Math.trunc(Number(e.target.value)||0));
-            state.splits[j.name][c.id]=Math.min(n, Number(j.delegates)||0);
+            state.splits[j.name][cand.id]=Math.min(n, Number(j.delegates)||0);
             normalizeSplit(j);
             save(); renderAll();
           });
         }
       }
 
-      // Result text
       const res = node.querySelector(`[data-res="${j.name}"]`);
       if(state.winners[j.name]){
         const c = state.candidates.find(x=>x.id===state.winners[j.name]);
         res.innerHTML = c ? `<span style="color:var(--good);font-weight:900">${c.short}</span> gets all <span class="tag">${j.delegates}</span>` : `Assigned`;
       } else {
-        // show split summary
         const split = state.splits[j.name];
         let any = false;
         const parts = [];
-        for(const c of state.candidates){
-          const v = Number(split[c.id]||0);
-          if(v>0){ any=true; parts.push(`${c.short}: ${v}`); }
+        for(const cand of state.candidates){
+          const v = Number(split[cand.id]||0);
+          if(v>0){ any=true; parts.push(`${cand.short}: ${v}`); }
         }
         res.textContent = any ? parts.join(" • ") : "Unassigned";
         res.style.color = any ? "rgba(255,255,255,.86)" : "rgba(255,255,255,.62)";
       }
     }
-
     save();
   }
 
   function renderAll(){
     renderPills();
+    renderMapAssignPicker();
+    renderMap();
     renderSupers();
     renderStates();
     renderLeaders();
   }
 
-  // Actions
+  // --- UI actions ---
   $("#addBtn").addEventListener("click", ()=>{
     const name = $("#cName").value.trim();
     const shortRaw = $("#cShort").value.trim();
@@ -641,17 +805,15 @@
     const cand = { id: crypto.randomUUID(), name, short };
     state.candidates.push(cand);
 
-    // add split keys
     for(const j of state.jurisdictions){
       state.splits[j.name] ??= {};
       state.splits[j.name][cand.id]=0;
     }
-
     $("#cName").value=""; $("#cShort").value="";
     save(); renderAll(); toast("Candidate added.");
   });
 
-  $("#splitMode").addEventListener("change", ()=>renderStates());
+  $("#splitMode").addEventListener("change", ()=>renderAll());
   $("#search").addEventListener("input", ()=>renderStates());
 
   $("#clearAllStates").addEventListener("click", ()=>{
@@ -661,6 +823,14 @@
     }
     save(); renderAll(); toast("Cleared all states.");
   });
+
+  $("#mapClearSelect").addEventListener("click", ()=>{
+    state.mapSelectedAbbr = null;
+    save(); renderAll();
+  });
+
+  $("#mapAssignOn").addEventListener("change", ()=>renderAll());
+  $("#mapAssignPick").addEventListener("change", ()=>renderAll());
 
   $("#exportBtn").addEventListener("click", ()=>{
     const payload = JSON.stringify(state, null, 2);

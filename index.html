@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Delegate Calculator</title>
+  <style>
+    :root{
+      --bg:#0b0d12;
+      --panel: rgba(255,255,255,.06);
+      --stroke: rgba(255,255,255,.12);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.68);
+      --good: rgba(70,255,170,.95);
+      --warn: rgba(255,210,120,.95);
+      --bad: rgba(255,110,150,.95);
+      --radius: 18px;
+      --shadow: 0 18px 50px rgba(0,0,0,.55);
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; color:var(--text); font-family:var(--sans);
+      background:
+        radial-gradient(1200px 700px at 10% -10%, rgba(128, 90, 213,.45), transparent 55%),
+        radial-gradient(900px 600px at 95% 10%, rgba(56, 189, 248,.35), transparent 55%),
+        radial-gradient(900px 700px at 60% 110%, rgba(34, 197, 94,.28), transparent 60%),
+        linear-gradient(180deg, #06070b 0%, #0b0d12 55%, #07080c 100%);
+    }
+    .wrap{max-width:1200px;margin:26px auto 60px;padding:0 16px}
+    header{display:flex;gap:14px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+    h1{margin:0;font-size:clamp(22px,3vw,34px);letter-spacing:-.02em}
+    .sub{color:var(--muted);max-width:75ch;font-size:14px;line-height:1.35;margin-top:6px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .card{
+      border:1px solid var(--stroke);
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(14px);
+      overflow:hidden;
+    }
+    .hd{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.10);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+    .hd h2{margin:0;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.82)}
+    .bd{padding:14px 16px}
+    .grid{display:grid;grid-template-columns: 420px 1fr; gap:14px; align-items:start; margin-top:14px}
+    @media(max-width:1020px){.grid{grid-template-columns:1fr}}
+    .btn{
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      padding:10px 12px;border-radius:12px;cursor:pointer;
+      font-weight:650;font-size:13px;letter-spacing:-.01em;
+    }
+    .btn:hover{background:rgba(255,255,255,.10)}
+    .btn.good{border-color:rgba(34,197,94,.35);background:linear-gradient(180deg, rgba(34,197,94,.20), rgba(34,197,94,.10))}
+    .btn.primary{border-color:rgba(56,189,248,.35);background:linear-gradient(180deg, rgba(56,189,248,.22), rgba(56,189,248,.12))}
+    .btn.bad{border-color:rgba(255,110,150,.32);background:linear-gradient(180deg, rgba(255,110,150,.22), rgba(255,110,150,.10))}
+    .btn.ghost{background:transparent}
+    .input,.select{
+      border:1px solid var(--stroke);
+      background:rgba(0,0,0,.18);
+      color:var(--text);
+      padding:10px 12px;border-radius:12px;min-height:42px;
+      outline:none;font-size:13px;
+    }
+    .input:focus,.select:focus{border-color:rgba(56,189,248,.55);box-shadow:0 0 0 4px rgba(56,189,248,.12)}
+    .pill{
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.06);
+      border-radius:999px;padding:10px 12px;display:flex;gap:10px;align-items:center;
+    }
+    .pill .k{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.62)}
+    .pill .v{font-family:var(--mono);font-size:13px;font-weight:800}
+    .leader{
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.04);
+      border-radius:14px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;
+    }
+    .leader .name{font-weight:800;letter-spacing:-.01em}
+    .leader .meta{font-family:var(--mono);font-size:12px;color:var(--muted)}
+    .bar{height:10px;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(0,0,0,.22);overflow:hidden}
+    .bar>div{height:100%;width:0%;background:linear-gradient(90deg, rgba(56,189,248,.95), rgba(34,197,94,.9));transition:width .2s ease}
+    .list{display:flex;flex-direction:column;gap:10px}
+    .small{font-size:12px;color:rgba(255,255,255,.62);line-height:1.35}
+    .item{
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.04);
+      border-radius:14px;padding:10px;
+      display:grid;
+      grid-template-columns: 1.1fr 140px 1fr 130px;
+      gap:10px;
+      align-items:center;
+    }
+    @media(max-width:980px){
+      .item{grid-template-columns:1fr; }
+    }
+    .tag{font-family:var(--mono);font-size:12px;color:rgba(255,255,255,.62)}
+    .splitbox{
+      display:none;
+      border-top:1px solid rgba(255,255,255,.10);
+      padding-top:10px;margin-top:6px;
+      gap:8px;flex-direction:column;
+    }
+    .splitrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .splitrow label{width:80px;font-family:var(--mono);font-size:12px;color:rgba(255,255,255,.65)}
+    .tiny{width:90px;min-height:36px;padding:8px 10px;font-family:var(--mono)}
+    .toast{
+      position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+      background:rgba(10,12,18,.85);border:1px solid rgba(255,255,255,.14);
+      padding:10px 12px;border-radius:999px;box-shadow:0 14px 50px rgba(0,0,0,.65);
+      backdrop-filter: blur(10px);opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;
+      font-family:var(--mono);font-size:13px;z-index:9999
+    }
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(-2px)}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Delegate Calculator</h1>
+      <div class="sub">Assign each state/territory to a candidate with a dropdown. Supers are weighted blocs. Split mode exists for when you feel like suffering.</div>
+    </div>
+    <div class="row">
+      <div class="pill"><div><div class="k">Total</div><div class="v" id="pTotal">0</div></div></div>
+      <div class="pill"><div><div class="k">To Win</div><div class="v" id="pWin">0</div></div></div>
+      <div class="pill"><div><div class="k">States/Terr</div><div class="v" id="pST">0</div></div></div>
+      <div class="pill"><div><div class="k">Supers</div><div class="v" id="pSup">0</div></div></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT -->
+    <section class="card">
+      <div class="hd">
+        <h2>Candidates</h2>
+        <div class="row">
+          <button class="btn ghost" id="resetBtn">Reset</button>
+          <button class="btn primary" id="exportBtn">Export</button>
+          <button class="btn" id="importBtn">Import</button>
+        </div>
+      </div>
+      <div class="bd">
+        <div class="row" style="margin-bottom:10px">
+          <input class="input" id="cName" placeholder="Candidate name (ex: AOC)" style="flex:1;min-width:200px">
+          <input class="input" id="cShort" placeholder="Short (ex: AOC)" maxlength="10" style="width:140px">
+          <button class="btn good" id="addBtn">Add</button>
+        </div>
+
+        <div class="bar" title="Top share"><div id="topBar"></div></div>
+        <div class="small" style="margin:10px 0 12px">Leaderboard includes state/territory allocations + assigned super blocs.</div>
+
+        <div class="list" id="leaders"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT -->
+    <section class="card">
+      <div class="hd">
+        <h2>Allocation</h2>
+        <div class="row">
+          <input class="input" id="search" placeholder="Search…" style="width:220px">
+          <label class="row small" style="gap:8px">
+            <input type="checkbox" id="splitMode">
+            Split mode
+          </label>
+        </div>
+      </div>
+      <div class="bd">
+        <div class="card" style="box-shadow:none;background:rgba(255,255,255,.03);border-radius:var(--radius);border:1px solid rgba(255,255,255,.10);margin-bottom:12px">
+          <div class="hd" style="border-bottom:1px solid rgba(255,255,255,.08)">
+            <h2>Superdelegates (Weighted Blocs)</h2>
+            <div class="tag">Total: <span id="supInline">0</span></div>
+          </div>
+          <div class="bd" id="supers"></div>
+        </div>
+
+        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+          <div class="small">Pick a winner per state quickly. If split mode is on, you can type numbers too.</div>
+          <button class="btn ghost" id="clearAllStates">Clear all states</button>
+        </div>
+
+        <div class="list" id="states"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const KEY = "delegate_calc_friendly_v1";
+
+  const DEFAULT_J = [
+    { name: "California", delegates: 420 },
+    { name: "Texas", delegates: 310 },
+    { name: "New York", delegates: 280 },
+    { name: "Florida", delegates: 230 },
+    { name: "Pennsylvania", delegates: 200 },
+    { name: "Illinois", delegates: 170 },
+    { name: "Ohio", delegates: 165 },
+    { name: "Georgia", delegates: 155 },
+    { name: "Michigan", delegates: 150 },
+    { name: "North Carolina", delegates: 145 },
+
+    { name: "New Jersey", delegates: 110 },
+    { name: "Virginia", delegates: 105 },
+    { name: "Washington", delegates: 100 },
+    { name: "Arizona", delegates: 95 },
+    { name: "Massachusetts", delegates: 95 },
+    { name: "Tennessee", delegates: 90 },
+    { name: "Indiana", delegates: 85 },
+    { name: "Missouri", delegates: 80 },
+    { name: "Maryland", delegates: 80 },
+    { name: "Wisconsin", delegates: 80 },
+    { name: "Minnesota", delegates: 75 },
+    { name: "Colorado", delegates: 75 },
+    { name: "Alabama", delegates: 70 },
+    { name: "South Carolina", delegates: 70 },
+    { name: "Louisiana", delegates: 65 },
+    { name: "Kentucky", delegates: 65 },
+    { name: "Oregon", delegates: 65 },
+    { name: "Oklahoma", delegates: 60 },
+    { name: "Connecticut", delegates: 60 },
+    { name: "Iowa", delegates: 55 },
+    { name: "Arkansas", delegates: 55 },
+    { name: "Mississippi", delegates: 55 },
+    { name: "Kansas", delegates: 55 },
+    { name: "Nevada", delegates: 55 },
+    { name: "Utah", delegates: 50 },
+    { name: "New Mexico", delegates: 50 },
+    { name: "Nebraska", delegates: 50 },
+    { name: "West Virginia", delegates: 45 },
+    { name: "Idaho", delegates: 45 },
+    { name: "Hawaii", delegates: 45 },
+    { name: "Maine", delegates: 45 },
+    { name: "New Hampshire", delegates: 45 },
+    { name: "Montana", delegates: 40 },
+    { name: "Rhode Island", delegates: 40 },
+    { name: "Delaware", delegates: 40 },
+    { name: "South Dakota", delegates: 35 },
+    { name: "North Dakota", delegates: 35 },
+    { name: "Vermont", delegates: 35 },
+    { name: "Wyoming", delegates: 30 },
+    { name: "Alaska", delegates: 30 },
+
+    { name: "District of Columbia", delegates: 50, territory: true },
+    { name: "Puerto Rico", delegates: 55, territory: true },
+    { name: "U.S. Virgin Islands", delegates: 15, territory: true },
+    { name: "Guam", delegates: 15, territory: true },
+    { name: "American Samoa", delegates: 15, territory: true },
+    { name: "Northern Mariana Islands", delegates: 15, territory: true },
+  ];
+
+  const DEFAULT_SUPERS = [
+    { id: "committee_chair", label: "Committee Chair", votes: 60 },
+    { id: "committee_vice", label: "Committee Vice Chair", votes: 40 },
+    { id: "potus", label: "President of the United States", votes: 90 },
+    { id: "sen_leader", label: "Senate Democratic Leader", votes: 60 },
+    { id: "sen_whip", label: "Senate Democratic Whip", votes: 40 },
+    { id: "house_leader", label: "House Democratic Leader", votes: 60 },
+    { id: "house_whip", label: "House Democratic Whip", votes: 40 },
+    { id: "gov1", label: "Democratic Governor (1)", votes: 45 },
+    { id: "gov2", label: "Democratic Governor (2)", votes: 45 },
+  ];
+
+  const DEFAULT_C = [
+    { id: crypto.randomUUID(), name: "Candidate A", short: "A" },
+    { id: crypto.randomUUID(), name: "Candidate B", short: "B" },
+  ];
+
+  const $ = s => document.querySelector(s);
+  const toastEl = $("#toast");
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    setTimeout(()=>toastEl.classList.remove("show"), 1400);
+  }
+
+  function defState(){
+    const st = {
+      candidates: structuredClone(DEFAULT_C),
+      jurisdictions: structuredClone(DEFAULT_J),
+      supers: structuredClone(DEFAULT_SUPERS),
+      // winner assignment (fast path): { jName: candidateId|null }
+      winners: {},
+      // split allocations: { jName: { candidateId: number } }
+      splits: {},
+      // super assignments: { superId: candidateId|null }
+      superPick: {},
+    };
+    for(const j of st.jurisdictions){
+      st.winners[j.name] = null;
+      st.splits[j.name] = {};
+      for(const c of st.candidates) st.splits[j.name][c.id] = 0;
+    }
+    for(const s of st.supers) st.superPick[s.id] = null;
+    return st;
+  }
+
+  function load(){
+    try{
+      const raw = localStorage.getItem(KEY);
+      if(!raw) return defState();
+      const st = JSON.parse(raw);
+
+      // repair minimal
+      st.candidates ??= structuredClone(DEFAULT_C);
+      st.jurisdictions ??= structuredClone(DEFAULT_J);
+      st.supers ??= structuredClone(DEFAULT_SUPERS);
+      st.winners ??= {};
+      st.splits ??= {};
+      st.superPick ??= {};
+
+      for(const j of st.jurisdictions){
+        if(!(j.name in st.winners)) st.winners[j.name] = null;
+        st.splits[j.name] ??= {};
+        for(const c of st.candidates){
+          if(typeof st.splits[j.name][c.id] !== "number") st.splits[j.name][c.id] = 0;
+        }
+      }
+      for(const s of st.supers){
+        if(!(s.id in st.superPick)) st.superPick[s.id] = null;
+      }
+
+      return st;
+    } catch {
+      return defState();
+    }
+  }
+
+  let state = load();
+  function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+
+  const sumST = () => state.jurisdictions.reduce((a,j)=>a + (Number(j.delegates)||0), 0);
+  const sumSup = () => state.supers.reduce((a,s)=>a + (Number(s.votes)||0), 0);
+  const total = () => sumST() + sumSup();
+  const toWin = () => Math.floor(total()/2) + 1;
+
+  function totals(){
+    const t = {};
+    for(const c of state.candidates) t[c.id]=0;
+
+    // States/Terr
+    for(const j of state.jurisdictions){
+      const win = state.winners[j.name];
+      const del = Number(j.delegates)||0;
+      if(win){
+        t[win] += del;
+      } else {
+        // split totals
+        const split = state.splits[j.name] || {};
+        for(const c of state.candidates) t[c.id] += Number(split[c.id]||0);
+      }
+    }
+
+    // Supers
+    for(const s of state.supers){
+      const pick = state.superPick[s.id];
+      if(pick) t[pick] += Number(s.votes||0);
+    }
+
+    return t;
+  }
+
+  function renderPills(){
+    $("#pTotal").textContent = total();
+    $("#pWin").textContent = toWin();
+    $("#pST").textContent = sumST();
+    $("#pSup").textContent = sumSup();
+    $("#supInline").textContent = sumSup();
+  }
+
+  function renderLeaders(){
+    const box = $("#leaders");
+    box.innerHTML = "";
+    const t = totals();
+    const all = total();
+    const win = toWin();
+    const sorted = [...state.candidates].sort((a,b)=>(t[b.id]||0)-(t[a.id]||0));
+
+    const top = sorted[0] ? (t[sorted[0].id]||0) : 0;
+    $("#topBar").style.width = all ? `${Math.min(100, (top/all)*100)}%` : "0%";
+
+    for(const c of sorted){
+      const v = t[c.id]||0;
+      const pct = all ? (v/all)*100 : 0;
+      const need = Math.max(0, win - v);
+
+      const meta = v >= win
+        ? `<span style="color:var(--good);font-weight:900">WINNING</span>`
+        : `<span style="color:var(--warn);font-weight:900">NEEDS ${need}</span>`;
+
+      const node = document.createElement("div");
+      node.className="leader";
+      node.innerHTML = `
+        <div>
+          <div class="name">${c.name} <span class="tag">(${c.short})</span></div>
+          <div class="meta">${v} / ${all} (${pct.toFixed(1)}%) • ${meta}</div>
+        </div>
+        <button class="btn bad" data-rm="${c.id}">Remove</button>
+      `;
+      box.appendChild(node);
+    }
+
+    box.querySelectorAll("[data-rm]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-rm");
+        if(state.candidates.length<=1){ toast("Need at least 1 candidate."); return; }
+        state.candidates = state.candidates.filter(c=>c.id!==id);
+
+        // remove from splits + winners + supers
+        for(const j of state.jurisdictions){
+          delete state.splits[j.name][id];
+          if(state.winners[j.name]===id) state.winners[j.name]=null;
+        }
+        for(const s of state.supers){
+          if(state.superPick[s.id]===id) state.superPick[s.id]=null;
+        }
+        save(); renderAll(); toast("Candidate removed.");
+      });
+    });
+  }
+
+  function candidateOptions(selectedId){
+    const frag = document.createDocumentFragment();
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "Unassigned";
+    frag.appendChild(opt0);
+
+    for(const c of state.candidates){
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = `${c.short} • ${c.name}`;
+      if(selectedId===c.id) opt.selected=true;
+      frag.appendChild(opt);
+    }
+    return frag;
+  }
+
+  function renderSupers(){
+    const box = $("#supers");
+    box.innerHTML = "";
+
+    for(const s of state.supers){
+      const row = document.createElement("div");
+      row.className="item";
+      row.style.gridTemplateColumns="1.2fr 120px 1fr 130px";
+      row.innerHTML = `
+        <div>
+          <div style="font-weight:850">${s.label}</div>
+          <div class="tag">bloc id: ${s.id}</div>
+        </div>
+        <div>
+          <div class="tag">Weight</div>
+          <input class="input tiny" type="number" min="0" step="1" value="${Number(s.votes||0)}" data-w="${s.id}">
+        </div>
+        <div>
+          <div class="tag">Assign to</div>
+          <select class="select" data-p="${s.id}"></select>
+        </div>
+        <div class="row" style="justify-content:flex-end">
+          <button class="btn ghost" data-csup="${s.id}">Clear</button>
+        </div>
+      `;
+      box.appendChild(row);
+
+      const sel = row.querySelector(`[data-p="${s.id}"]`);
+      sel.appendChild(candidateOptions(state.superPick[s.id]));
+      sel.addEventListener("change", (e)=>{
+        state.superPick[s.id] = e.target.value || null;
+        save(); renderAll();
+      });
+
+      const w = row.querySelector(`[data-w="${s.id}"]`);
+      w.addEventListener("change", (e)=>{
+        const n = Math.max(0, Math.trunc(Number(e.target.value)||0));
+        s.votes = n;
+        save(); renderAll();
+      });
+
+      row.querySelector(`[data-csup="${s.id}"]`).addEventListener("click", ()=>{
+        state.superPick[s.id]=null;
+        save(); renderAll();
+      });
+    }
+  }
+
+  function normalizeSplit(j){
+    const cap = Number(j.delegates)||0;
+    const split = state.splits[j.name];
+    let sum = 0;
+    for(const c of state.candidates) sum += Number(split[c.id]||0);
+    if(sum <= cap) return;
+
+    // scale down proportionally
+    const scaled = state.candidates.map(c=>{
+      const v = Number(split[c.id]||0);
+      return { id:c.id, raw: v, val: sum ? (v/sum)*cap : 0 };
+    });
+    // floor then distribute remainder
+    let used = 0;
+    const floored = scaled.map(x=>({id:x.id, v:Math.floor(x.val), frac:x.val-Math.floor(x.val)}));
+    used = floored.reduce((a,x)=>a+x.v,0);
+    let rem = cap - used;
+    floored.sort((a,b)=>b.frac-a.frac);
+    let i=0;
+    while(rem>0 && i<floored.length){ floored[i].v++; rem--; i++; }
+    // write back
+    for(const f of floored) split[f.id]=f.v;
+  }
+
+  function renderStates(){
+    const box = $("#states");
+    box.innerHTML = "";
+    const q = $("#search").value.trim().toLowerCase();
+    const splitOn = $("#splitMode").checked;
+
+    let items = [...state.jurisdictions].sort((a,b)=>(b.delegates||0)-(a.delegates||0) || a.name.localeCompare(b.name));
+    if(q) items = items.filter(j=>j.name.toLowerCase().includes(q));
+
+    for(const j of items){
+      // repair split keys for new candidates
+      state.splits[j.name] ??= {};
+      for(const c of state.candidates){
+        if(typeof state.splits[j.name][c.id] !== "number") state.splits[j.name][c.id]=0;
+      }
+
+      const node = document.createElement("div");
+      node.className="item";
+      node.innerHTML = `
+        <div>
+          <div style="font-weight:850">${j.name}</div>
+          <div class="tag">${j.territory ? "territory" : "state"} • ${j.delegates} delegates</div>
+        </div>
+
+        <div>
+          <div class="tag">Quick assign</div>
+          <select class="select" data-win="${j.name}"></select>
+        </div>
+
+        <div>
+          <div class="tag">Result</div>
+          <div class="small" data-res="${j.name}"></div>
+          <div class="splitbox" data-splitbox="${j.name}"></div>
+        </div>
+
+        <div class="row" style="justify-content:flex-end">
+          <button class="btn ghost" data-clear="${j.name}">Clear</button>
+        </div>
+      `;
+      box.appendChild(node);
+
+      // Dropdown
+      const sel = node.querySelector(`[data-win="${j.name}"]`);
+      sel.appendChild(candidateOptions(state.winners[j.name]));
+      sel.addEventListener("change", (e)=>{
+        const val = e.target.value || null;
+        state.winners[j.name] = val;
+
+        // if winner chosen, zero splits for cleanliness
+        if(val){
+          for(const c of state.candidates) state.splits[j.name][c.id]=0;
+        }
+        save(); renderAll();
+      });
+
+      // Clear
+      node.querySelector(`[data-clear="${j.name}"]`).addEventListener("click", ()=>{
+        state.winners[j.name]=null;
+        for(const c of state.candidates) state.splits[j.name][c.id]=0;
+        save(); renderAll();
+      });
+
+      // Split UI
+      const splitbox = node.querySelector(`[data-splitbox="${j.name}"]`);
+      const showSplit = splitOn && !state.winners[j.name];
+      splitbox.style.display = showSplit ? "flex" : "none";
+
+      if(showSplit){
+        splitbox.innerHTML = "";
+        for(const c of state.candidates){
+          const r = document.createElement("div");
+          r.className="splitrow";
+          r.innerHTML = `
+            <label title="${c.name}">${c.short}</label>
+            <input class="input tiny" type="number" min="0" step="1" value="${Number(state.splits[j.name][c.id]||0)}" data-s="${j.name}" data-c="${c.id}">
+          `;
+          splitbox.appendChild(r);
+          const inp = r.querySelector("input");
+          inp.addEventListener("change", (e)=>{
+            const n = Math.max(0, Math.trunc(Number(e.target.value)||0));
+            state.splits[j.name][c.id]=Math.min(n, Number(j.delegates)||0);
+            normalizeSplit(j);
+            save(); renderAll();
+          });
+        }
+      }
+
+      // Result text
+      const res = node.querySelector(`[data-res="${j.name}"]`);
+      if(state.winners[j.name]){
+        const c = state.candidates.find(x=>x.id===state.winners[j.name]);
+        res.innerHTML = c ? `<span style="color:var(--good);font-weight:900">${c.short}</span> gets all <span class="tag">${j.delegates}</span>` : `Assigned`;
+      } else {
+        // show split summary
+        const split = state.splits[j.name];
+        let any = false;
+        const parts = [];
+        for(const c of state.candidates){
+          const v = Number(split[c.id]||0);
+          if(v>0){ any=true; parts.push(`${c.short}: ${v}`); }
+        }
+        res.textContent = any ? parts.join(" • ") : "Unassigned";
+        res.style.color = any ? "rgba(255,255,255,.86)" : "rgba(255,255,255,.62)";
+      }
+    }
+
+    save();
+  }
+
+  function renderAll(){
+    renderPills();
+    renderSupers();
+    renderStates();
+    renderLeaders();
+  }
+
+  // Actions
+  $("#addBtn").addEventListener("click", ()=>{
+    const name = $("#cName").value.trim();
+    const shortRaw = $("#cShort").value.trim();
+    if(!name){ toast("Name required."); return; }
+    const short = (shortRaw || name.slice(0,3)).toUpperCase().replace(/\s+/g,"").slice(0,10);
+    if(state.candidates.some(c=>c.short.toUpperCase()===short)){ toast("Short label must be unique."); return; }
+
+    const cand = { id: crypto.randomUUID(), name, short };
+    state.candidates.push(cand);
+
+    // add split keys
+    for(const j of state.jurisdictions){
+      state.splits[j.name] ??= {};
+      state.splits[j.name][cand.id]=0;
+    }
+
+    $("#cName").value=""; $("#cShort").value="";
+    save(); renderAll(); toast("Candidate added.");
+  });
+
+  $("#splitMode").addEventListener("change", ()=>renderStates());
+  $("#search").addEventListener("input", ()=>renderStates());
+
+  $("#clearAllStates").addEventListener("click", ()=>{
+    for(const j of state.jurisdictions){
+      state.winners[j.name]=null;
+      for(const c of state.candidates) state.splits[j.name][c.id]=0;
+    }
+    save(); renderAll(); toast("Cleared all states.");
+  });
+
+  $("#exportBtn").addEventListener("click", ()=>{
+    const payload = JSON.stringify(state, null, 2);
+    navigator.clipboard.writeText(payload).then(()=>toast("Export copied.")).catch(()=>{
+      prompt("Copy JSON:", payload);
+    });
+  });
+
+  $("#importBtn").addEventListener("click", ()=>{
+    const raw = prompt("Paste exported JSON:");
+    if(!raw) return;
+    try{
+      localStorage.setItem(KEY, raw);
+      state = load();
+      save(); renderAll(); toast("Imported.");
+    } catch {
+      toast("Invalid JSON.");
+    }
+  });
+
+  $("#resetBtn").addEventListener("click", ()=>{
+    if(!confirm("Reset everything in this browser?")) return;
+    localStorage.removeItem(KEY);
+    state = defState();
+    save(); renderAll(); toast("Reset done.");
+  });
+
+  // Init
+  save();
+  renderAll();
+})();
+</script>
+</body>
+</html>
